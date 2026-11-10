@@ -145,6 +145,8 @@
 
   let ytFallbackFor = '';
   let ytMainDuration = 0;
+  addEventListener('yt-navigate-start', () => { ytMainDuration = 0; youtubeAdState = null; }, true);
+  addEventListener('yt-navigate-finish', () => { ytMainDuration = 0; }, true);
   let ytBlockedSince = 0;
   function ytKillEnforcement(video) {
     const wall = document.querySelector('ytd-enforcement-message-view-model, #error-screen ytd-enforcement-message-view-model, tp-yt-paper-dialog:has(ytd-enforcement-message-view-model)');
@@ -196,7 +198,8 @@
       if (!youtubeAdState) youtubeAdState = {rate:video.playbackRate||1, muted:video.muted, volume:video.volume};
       try { video.muted = true; video.volume = 0; video.playbackRate = 16; } catch (_) {}
       // seek только если в <video> реально рекламный ролик, а не основное видео (иначе плейлист перескакивает на следующий трек)
-      const isAdMedia = Number.isFinite(video.duration) && video.duration > 0 && video.duration < 200 && (!ytMainDuration || Math.abs(video.duration - ytMainDuration) > 0.6);
+      const adUi = [...document.querySelectorAll('.ytp-ad-text, .ytp-ad-preview-container, .ytp-ad-simple-ad-badge, .ytp-ad-skip-button-container')].some(e => e.offsetParent !== null || e.getClientRects().length);
+      const isAdMedia = adUi && Number.isFinite(video.duration) && video.duration > 0 && video.duration < 200 && video.currentTime > 0 && ytMainDuration > 0 && Math.abs(video.duration - ytMainDuration) > 0.6;
       if (isAdMedia) {
         try { if (video.currentTime < video.duration - .15) video.currentTime = Math.max(0, video.duration - .08); } catch (_) {}
       }
