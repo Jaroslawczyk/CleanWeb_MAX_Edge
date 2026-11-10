@@ -152,6 +152,21 @@
   let ytMainDuration = 0;
   let ytLastKill = 0;
   let ytLastSkipClick = 0;
+  let ytWatch = {t: -1, since: 0};
+  // костыль: реклама/видео «залипли» (узел googlevideo не резолвится) — перезагружаем страницу, YouTube выберет другой узел
+  function ytStallWatchdog(video, adShowing) {
+    if (!video) return;
+    const now = Date.now();
+    const stalled = !video.paused && video.readyState < 3;
+    if (!stalled || Math.abs(video.currentTime - ytWatch.t) > 0.05) { ytWatch = {t: video.currentTime, since: now}; return; }
+    const limit = adShowing ? 7000 : 12000;
+    if (now - ytWatch.since < limit) return;
+    let n = 0; const key = 'cw_reload_' + getVideoId();
+    try { n = +(sessionStorage.getItem(key) || 0); } catch (_) {}
+    if (n >= 2) return;
+    try { sessionStorage.setItem(key, String(n + 1)); } catch (_) {}
+    location.reload();
+  }
   addEventListener('yt-navigate-start', () => { ytMainDuration = 0; youtubeAdState = null; }, true);
   addEventListener('yt-navigate-finish', () => { ytMainDuration = 0; }, true);
   let ytBlockedSince = 0;
@@ -224,6 +239,7 @@
       }
     }
 
+    ytStallWatchdog(video, adShowing);
     if (adShowing && video) {
       if (!youtubeAdState) youtubeAdState = {rate:video.playbackRate||1, muted:video.muted, volume:video.volume};
       try { video.muted = true; } catch (_) {}
