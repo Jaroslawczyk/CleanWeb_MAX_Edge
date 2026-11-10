@@ -145,41 +145,53 @@
 
   let ytFallbackFor = '';
   let ytMainDuration = 0;
+  let ytLastKill = 0;
   addEventListener('yt-navigate-start', () => { ytMainDuration = 0; youtubeAdState = null; }, true);
   addEventListener('yt-navigate-finish', () => { ytMainDuration = 0; }, true);
   let ytBlockedSince = 0;
-  function ytKillEnforcement(video) {
-    const wall = document.querySelector('ytd-enforcement-message-view-model, #error-screen ytd-enforcement-message-view-model, tp-yt-paper-dialog:has(ytd-enforcement-message-view-model)');
-    let dlg = wall;
-    if (!dlg) {
-      for (const d of document.querySelectorAll('tp-yt-paper-dialog, ytd-popup-container, ytd-mealbar-promo-renderer')) {
-        if (/(блокировщик|ad ?block|Условия использования YouTube|Terms of Service)/i.test((d.innerText||'').slice(0,600)) && /(рекл|ads?)/i.test(d.innerText||'')) { dlg = d; break; }
-      }
+  const WALL_RE = /(блокировщик\w* рекламы нарушают|ad blockers? violate|Ad blockers? are not allowed|Условия использования YouTube)/i;
+  function ytFindWall() {
+    const known = document.querySelector('ytd-enforcement-message-view-model, yt-playability-error-supported-renderers, #error-screen');
+    if (known && WALL_RE.test(known.innerText || known.textContent || '')) return known;
+    if (known && known.tagName === 'YTD-ENFORCEMENT-MESSAGE-VIEW-MODEL') return known;
+    for (const d of document.querySelectorAll('tp-yt-paper-dialog, ytd-popup-container tp-yt-paper-dialog, #player, #player-container-outer, ytd-player')) {
+      const t = (d.innerText || '').slice(0, 800);
+      if (WALL_RE.test(t) && /(рекл|ads?)/i.test(t)) return d;
     }
-    if (!dlg) { ytBlockedSince = 0; return; }
-    try { dlg.querySelectorAll('[aria-label*="Close" i],[aria-label*="Закры" i],#dismiss-button button').forEach(b => b.click()); } catch (_) {}
-    try { dlg.remove(); } catch (_) {}
+    return null;
+  }
+  function ytEmbedFallback(video) {
+    const id = getVideoId();
+    if (!id || ytFallbackFor === id) return;
+    ytFallbackFor = id;
+    const host = document.querySelector('#player-container-outer, #player-container, #player, ytd-player') || document.querySelector('#movie_player')?.parentElement;
+    if (!host) return;
+    let t = 0; try { t = Math.floor(+(new URL(location.href).searchParams.get('t') || '0').replace(/s$/, '') || 0); } catch (_) {}
+    const f = document.createElement('iframe');
+    f.id = 'cleanweb-embed';
+    f.src = 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&rel=0&start=' + t;
+    f.allow = 'autoplay; fullscreen; picture-in-picture; encrypted-media';
+    f.allowFullscreen = true;
+    f.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0;z-index:2147483000;background:#000';
+    try { if (getComputedStyle(host).position === 'static') host.style.position = 'relative'; } catch (_) {}
+    host.appendChild(f);
+    try { video && video.pause(); } catch (_) {}
+  }
+  function ytKillEnforcement(video) {
+    if (!enabled) return;
+    const now = Date.now(); if (now - ytLastKill < 500) return; ytLastKill = now;
+    const wall = ytFindWall();
+    if (!wall) { ytBlockedSince = 0; return; }
+    if (!ytBlockedSince) ytBlockedSince = Date.now();
+    const isHost = wall.id === 'player' || wall.id === 'player-container-outer' || wall.tagName === 'YTD-PLAYER';
+    if (!isHost) { try { wall.querySelectorAll('[aria-label*="Close" i],[aria-label*="Закры" i]').forEach(b => b.click()); } catch (_) {} }
+    if (!isHost) { try { wall.remove(); } catch (_) {} }
     document.querySelectorAll('tp-yt-iron-overlay-backdrop').forEach(n => { try { n.remove(); } catch (_) {} });
     try { document.documentElement.style.overflow = ''; document.body.style.overflow = ''; document.body.removeAttribute('aria-hidden'); } catch (_) {}
     if (video && video.paused) { try { video.play(); } catch (_) {} }
-    if (!ytBlockedSince) ytBlockedSince = Date.now();
-    const id = getVideoId();
-    // костыль: если плеер не ожил за 1.2с — подменяем на embed (там нет проверки антиблока)
-    if (id && ytFallbackFor !== id && Date.now() - ytBlockedSince > 1200 && (!video || video.paused || video.readyState < 2)) {
-      ytFallbackFor = id;
-      const host = document.querySelector('#player-container-outer, #player-container, #player') || document.querySelector('#movie_player')?.parentElement;
-      if (!host) return;
-      let t = 0; try { t = Math.floor(new URL(location.href).searchParams.get('t')?.replace(/s$/,'') || video?.currentTime || 0); } catch (_) {}
-      const f = document.createElement('iframe');
-      f.src = 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&rel=0&start=' + t;
-      f.allow = 'autoplay; fullscreen; picture-in-picture; encrypted-media';
-      f.allowFullscreen = true;
-      f.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0;z-index:2147483000;background:#000';
-      try { if (getComputedStyle(host).position === 'static') host.style.position = 'relative'; } catch (_) {}
-      host.appendChild(f);
-      try { video && video.pause(); } catch (_) {}
-    }
+    if (Date.now() - ytBlockedSince > 700 && (!video || video.paused || video.readyState < 2 || video.currentTime < 0.5)) ytEmbedFallback(video);
   }
+  addEventListener('yt-navigate-start', () => { ytFallbackFor = ''; document.getElementById('cleanweb-embed')?.remove(); }, true);
   function handleYouTube() {
     if (!location.hostname.endsWith('youtube.com')) return;
     loadSponsorSegments();
