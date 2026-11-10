@@ -144,6 +144,7 @@
   }
 
   let ytFallbackFor = '';
+  let ytMainDuration = 0;
   let ytBlockedSince = 0;
   function ytKillEnforcement(video) {
     const wall = document.querySelector('ytd-enforcement-message-view-model, #error-screen ytd-enforcement-message-view-model, tp-yt-paper-dialog:has(ytd-enforcement-message-view-model)');
@@ -194,10 +195,13 @@
     if (adShowing && video) {
       if (!youtubeAdState) youtubeAdState = {rate:video.playbackRate||1, muted:video.muted, volume:video.volume};
       try { video.muted = true; video.volume = 0; video.playbackRate = 16; } catch (_) {}
-      if (Number.isFinite(video.duration) && video.duration > 0 && video.duration < 1800) {
+      // seek только если в <video> реально рекламный ролик, а не основное видео (иначе плейлист перескакивает на следующий трек)
+      const isAdMedia = Number.isFinite(video.duration) && video.duration > 0 && video.duration < 200 && (!ytMainDuration || Math.abs(video.duration - ytMainDuration) > 0.6);
+      if (isAdMedia) {
         try { if (video.currentTime < video.duration - .15) video.currentTime = Math.max(0, video.duration - .08); } catch (_) {}
       }
     } else {
+      if (video && Number.isFinite(video.duration) && video.duration > 0) ytMainDuration = video.duration;
       restoreYoutubeVideo(video);
       skipSponsor(video);
     }
