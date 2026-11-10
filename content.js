@@ -185,8 +185,8 @@
     const video = document.querySelector('video.html5-main-video, video');
     if (!enabled) { restoreYoutubeVideo(video); return; }
 
-    const adShowing = !!(player?.classList.contains('ad-showing') || player?.classList.contains('ad-interrupting') ||
-      document.querySelector('.ytp-ad-player-overlay, .ytp-ad-text, .ytp-ad-preview-container, .ytp-ad-action-interstitial'));
+    // только класс плеера: остаточные .ytp-ad-* узлы в DOM остаются и без рекламы -> раньше это перематывало обычные видео в конец
+    const adShowing = !!(player && (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting')));
 
     const skipSelectors = '.ytp-skip-ad-button, .ytp-ad-skip-button, .ytp-ad-skip-button-modern, button.ytp-ad-skip-button-modern, [id^="skip-button"] button, .ytp-ad-overlay-close-button';
     document.querySelectorAll(skipSelectors).forEach(btn => { try { btn.click(); } catch (_) {} });
