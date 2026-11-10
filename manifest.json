@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "CleanWeb MAX Ad Blocker",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "Агрессивная блокировка рекламы, трекеров, попапов и YouTube-рекламы + SponsorBlock и автообновляемые фильтры.",
   "permissions": [
     "declarativeNetRequest",

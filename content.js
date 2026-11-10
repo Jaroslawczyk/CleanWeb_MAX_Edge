@@ -151,6 +151,7 @@
   let ytFallbackFor = '';
   let ytMainDuration = 0;
   let ytLastKill = 0;
+  let ytLastSkipClick = 0;
   addEventListener('yt-navigate-start', () => { ytMainDuration = 0; youtubeAdState = null; }, true);
   addEventListener('yt-navigate-finish', () => { ytMainDuration = 0; }, true);
   let ytBlockedSince = 0;
@@ -210,6 +211,18 @@
 
     const skipSelectors = '.ytp-skip-ad-button, .ytp-ad-skip-button, .ytp-ad-skip-button-modern, button.ytp-ad-skip-button-modern, [id^="skip-button"] button, .ytp-ad-overlay-close-button';
     document.querySelectorAll(skipSelectors).forEach(btn => { try { btn.click(); } catch (_) {} });
+    if (adShowing && player && Date.now() - ytLastSkipClick > 400) {
+      // новый интерфейс: кнопка «Пропустить»/«Skip» без стабильного класса — ищем по тексту внутри плеера
+      const cand = player.querySelectorAll('button, [role="button"]');
+      for (const b of cand) {
+        const t = ((b.innerText || '') + ' ' + (b.getAttribute('aria-label') || '')).trim();
+        if (!/^(пропустить|skip|pomiń)/i.test(t)) continue;
+        if (!(b.offsetParent !== null || b.getClientRects().length)) continue;
+        ytLastSkipClick = Date.now();
+        try { b.click(); } catch (_) {}
+        break;
+      }
+    }
 
     if (adShowing && video) {
       if (!youtubeAdState) youtubeAdState = {rate:video.playbackRate||1, muted:video.muted, volume:video.volume};
