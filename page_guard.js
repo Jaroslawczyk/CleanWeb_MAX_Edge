@@ -20,12 +20,12 @@
     const origBeacon = navigator.sendBeacon?.bind(navigator);
     if (origBeacon) navigator.sendBeacon = function(url, data) {
       const u = String(url || '');
-      if (suspicious.test(u) || (host.endsWith('youtube.com') && /\/(?:pagead|ptracking|api\/stats\/ads)/i.test(u))) return true;
+      if (!host.endsWith('youtube.com') && suspicious.test(u)) return true;
       return origBeacon(url, data);
     };
   } catch (_) {}
 
-  if (!host.endsWith('youtube.com')) return;
+  return; // YouTube: ничего не подменяем и не блокируем — иначе срабатывает антиблокировщик; рекламу скипает content.js
 
   const stripAdKeys = obj => {
     const BAD = new Set(['adPlacements','playerAds','adSlots','adBreakHeartbeatParams','adBreakParams','ad3Module']);
