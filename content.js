@@ -38,9 +38,14 @@
   const AD_TEXT = new Set(['ad','ads','advertisement','advertising','sponsored','promoted','paid partnership','реклама','рекламный','спонсор','спонсируемое','промо','sponsorowane','reklama','promowane']);
   const antiAdblockRe = /(disable|turn off|remove|whitelist).{0,35}(ad.?block|ad blocker)|(ad.?block|ad blocker).{0,35}(detected|enabled|wyłącz|отключ|обнаруж)|(wyłącz|wyłacz).{0,25}(adblock|blokad)|(отключите|выключите).{0,30}(adblock|блокировщик)/i;
 
+  // YouTube: прячем ТОЛЬКО рекламу в ленте/на странице. Рекламу внутри плеера не трогаем и не ускоряем —
+  // иначе сервер видит «непросмотренную» рекламу и отдаёт 403 на видеопоток / показывает стену.
+  const IS_YT = location.hostname.endsWith('youtube.com');
+  const YT_STYLE = `ytd-display-ad-renderer, ytd-ad-slot-renderer, ytd-in-feed-ad-layout-renderer, ytd-promoted-sparkles-web-renderer,
+  ytd-promoted-video-renderer, ytd-search-pyv-renderer, ytd-banner-promo-renderer, #masthead-ad { display: none !important; }`;
   function enableStyle() {
     if (styleNode || !document.documentElement) return;
-    styleNode = document.createElement('style'); styleNode.id = 'cleanweb-max-style'; styleNode.textContent = STYLE;
+    styleNode = document.createElement('style'); styleNode.id = 'cleanweb-max-style'; styleNode.textContent = IS_YT ? YT_STYLE : STYLE;
     document.documentElement.appendChild(styleNode);
   }
   function disableStyle() { styleNode?.remove(); styleNode = null; document.documentElement?.classList.remove('cleanweb-unlocked'); }
@@ -208,13 +213,7 @@
 
     if (adShowing && video) {
       if (!youtubeAdState) youtubeAdState = {rate:video.playbackRate||1, muted:video.muted, volume:video.volume};
-      try { video.muted = true; video.volume = 0; video.playbackRate = 16; } catch (_) {}
-      // seek только если в <video> реально рекламный ролик, а не основное видео (иначе плейлист перескакивает на следующий трек)
-      const adUi = [...document.querySelectorAll('.ytp-ad-text, .ytp-ad-preview-container, .ytp-ad-simple-ad-badge, .ytp-ad-skip-button-container')].some(e => e.offsetParent !== null || e.getClientRects().length);
-      const isAdMedia = adUi && Number.isFinite(video.duration) && video.duration > 0 && video.duration < 200 && video.currentTime > 0 && ytMainDuration > 0 && Math.abs(video.duration - ytMainDuration) > 0.6;
-      if (isAdMedia) {
-        try { if (video.currentTime < video.duration - .15) video.currentTime = Math.max(0, video.duration - .08); } catch (_) {}
-      }
+      try { video.muted = true; } catch (_) {}
     } else {
       if (video && Number.isFinite(video.duration) && video.duration > 0) ytMainDuration = video.duration;
       restoreYoutubeVideo(video);
@@ -224,7 +223,7 @@
 
   function scan(root=document) {
     if (!enabled) return;
-    enableStyle(); siteSpecific(root); textAdHeuristics(root); handleYouTube();
+    enableStyle(); siteSpecific(root); if (!IS_YT) textAdHeuristics(root); handleYouTube();
   }
   function scheduleScan(root=document) {
     if (scheduled) return; scheduled = true;
