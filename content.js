@@ -234,7 +234,16 @@
         if (!/^(пропустить|skip|pomiń)/i.test(t)) continue;
         if (!(b.offsetParent !== null || b.getClientRects().length)) continue;
         ytLastSkipClick = Date.now();
-        try { b.click(); } catch (_) {}
+        // новый UI игнорирует голый .click(): шлём полную цепочку pointer/mouse событий с координатами
+        const r = b.getBoundingClientRect();
+        const o = {bubbles:true, cancelable:true, composed:true, view:window, clientX:r.left+r.width/2, clientY:r.top+r.height/2, button:0};
+        for (const el of [b, b.firstElementChild].filter(Boolean)) {
+          try {
+            el.dispatchEvent(new PointerEvent('pointerdown', o)); el.dispatchEvent(new MouseEvent('mousedown', o));
+            el.dispatchEvent(new PointerEvent('pointerup', o)); el.dispatchEvent(new MouseEvent('mouseup', o));
+            el.click();
+          } catch (_) {}
+        }
         break;
       }
     }
