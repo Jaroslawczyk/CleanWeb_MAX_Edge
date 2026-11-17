@@ -243,6 +243,12 @@
     if (adShowing && video) {
       if (!youtubeAdState) youtubeAdState = {rate:video.playbackRate||1, muted:video.muted, volume:video.volume};
       try { video.muted = true; } catch (_) {}
+      // проматываем рекламу: ускорение + переход в конец ролика рекламы
+      try { if (video.playbackRate < 16) video.playbackRate = 16; } catch (_) {}
+      const d = video.duration;
+      if (Number.isFinite(d) && d > 0.5 && d < 300 && video.currentTime < d - 0.3) {
+        try { video.currentTime = d - 0.1; } catch (_) {}
+      }
     } else {
       if (video && Number.isFinite(video.duration) && video.duration > 0) ytMainDuration = video.duration;
       restoreYoutubeVideo(video);
