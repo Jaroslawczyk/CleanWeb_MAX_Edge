@@ -216,9 +216,11 @@
   function handleYouTube() {
     if (!location.hostname.endsWith('youtube.com')) return;
     loadSponsorSegments();
-    ytKillEnforcement(document.querySelector('video.html5-main-video, video'));
-    const player = document.querySelector('.html5-video-player');
-    const video = document.querySelector('video.html5-main-video, video');
+    // на странице бывает несколько плееров (Shorts, трейлер канала, превью) — берём тот, где идёт реклама, иначе основной
+    const player = document.querySelector('.html5-video-player.ad-showing, .html5-video-player.ad-interrupting') ||
+      document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
+    const video = player?.querySelector('video.html5-main-video, video') || document.querySelector('video.html5-main-video, video');
+    ytKillEnforcement(video);
     if (!enabled) { restoreYoutubeVideo(video); return; }
 
     // только класс плеера: остаточные .ytp-ad-* узлы в DOM остаются и без рекламы -> раньше это перематывало обычные видео в конец
@@ -255,8 +257,11 @@
       // проматываем рекламу: ускорение + переход в конец ролика рекламы
       try { if (video.playbackRate < 16) video.playbackRate = 16; } catch (_) {}
       const d = video.duration;
-      if (Number.isFinite(d) && d > 0.5 && d < 300 && video.currentTime < d - 0.3) {
+      if (Number.isFinite(d) && d > 0.5 && video.currentTime < d - 0.3) {
         try { video.currentTime = d - 0.1; } catch (_) {}
+      } else if (Number.isFinite(d) && d > 0.5 && video.paused && !video.ended) {
+        // реклама встала на паузу у самого конца — запускаем, чтобы пришло событие ended
+        try { video.play()?.catch(() => {}); } catch (_) {}
       }
     } else {
       if (video && Number.isFinite(video.duration) && video.duration > 0) ytMainDuration = video.duration;
@@ -283,7 +288,7 @@
       scheduleScan(root);
     });
     observer.observe(document.documentElement,{childList:true,subtree:true});
-    setInterval(() => { if (enabled) { antiAdblock(); handleYouTube(); } }, location.hostname.endsWith('youtube.com') ? 250 : 1400);
+    setInterval(() => { if (enabled) { handleYouTube(); antiAdblock(); } }, location.hostname.endsWith('youtube.com') ? 250 : 1400);
   }
 
   API.storage.local.get({enabled:true,sponsorBlock:true}, data => { enabled=data.enabled!==false; sponsorEnabled=data.sponsorBlock!==false; start(); });
